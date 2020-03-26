@@ -9,7 +9,7 @@ if __name__ == '__main__':
     env = gym.make(environment)
     observation_space = env.observation_space.shape[0]
     action_space = env.action_space.shape[0]
-    model = tf.keras.models.load_model('MountainCarContinuous-v0_2_epsidode15')
+    model = tf.keras.models.load_model('MountainCarContinuous-v0_1_epsidode1025')
     total_reward_list = []
 
     for i in range(100):

@@ -42,7 +42,8 @@ class dqn_solver(object):
         return [self.memory[i] for i in index]
 
     def policy(self, state, episode):
-        self.epsilon_max = self.epsilon_max * self.aneal_rate
+        if self.steps > self.start_training_steps:
+            self.epsilon_max = self.epsilon_max * self.aneal_rate
         if np.random.rand() < max(self.epsilon_max, self.epsilon_min):
             action = env.action_space.sample()
         else:
@@ -58,11 +59,13 @@ class dqn_solver(object):
             state = np.reshape(state, [1, self.observation_space])
             done = False
             total_reward = 0
-            for i in range(self.max_steps):
+            steps = 0
+            while not done:
                 # env.render()
                 action = self.policy(state, episode)
                 new_state, reward, done, info = env.step(action)
-                # reward = reward if not done else -reward
+                if done and steps < 999:
+                    reward = 30
                 new_state = np.reshape(new_state, [1, self.observation_space])
                 total_reward += reward
                 self.remember(state, action, reward, new_state, done)
@@ -75,22 +78,19 @@ class dqn_solver(object):
                         q_values = self.model.predict(state_t_minus_1)
                         q_values[0] = q_update
                         self.model.fit(state_t_minus_1, q_values, verbose=0)
-                if done:
-                    break
-
                 state = new_state
                 self.steps += 1
-            steps_until_done_list.append(i)
+                steps += 1
+            if steps < 999:
+                for _ in range(10000):
+                    for i in range(steps):
+                        if self.memory_size > _ + len(self.memory) - 1:
+                            el = self.memory[len(self.memory) - 1 - i]
+                            self.remember(el[0], el[1], el[2], el[3], el[4])
             self.reward_list.append(total_reward)
             done_list.append(1 if done else 0)
-            if episode % 2 == 0:
-                done_array = np.array(done_list)
-                np.savetxt(f'{self.enviroment}_{self.number}_done_count.csv', done_array, delimiter=',')
-                plt.figure()
-                plt.plot(done_array)
-                plt.savefig(f'{self.enviroment}_{self.number}_done_count.png')
-                plt.close()
-
+            steps_until_done_list.append(steps)
+            if episode % 1 == 0 and self.steps > self.start_training_steps:
                 array = np.array(steps_until_done_list)
                 np.savetxt(f'{self.enviroment}_{self.number}_steps_per_episode.csv', array, delimiter=',')
                 plt.figure()
@@ -104,7 +104,7 @@ class dqn_solver(object):
                 plt.plot(reward_array)
                 plt.savefig(f'{self.enviroment}_reward_{self.number}.png')
                 plt.close()
-            if episode != 0 and episode % 5 == 0 or episode == self.episodes:
+            if episode != 0 and self.steps > self.start_training_steps and episode % 5 == 0 or episode == self.episodes:
                 self.model.save(f'{self.enviroment}_{self.number}_epsidode{episode}')
 
 
@@ -120,49 +120,7 @@ if __name__ == '__main__':
                                  ])
     model.compile(loss='mse', optimizer=tf.keras.optimizers.Adam(lr=0.001))
 
-    # DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=500, batch_size=20,
-    #                         episodes=20, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=500, train_freq=50,
-    #                         aneal_rate=0.999, number=1)
-    # DQG_SOLVER.train()
-
-    # DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=10000, batch_size=20,
-    #                         episodes=20, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=1000, train_freq=20,
-    #                         aneal_rate=0.9995, number=2)
-    # DQG_SOLVER.train()
-
-    DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=10000, batch_size=20,
-                            episodes=30, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=1000, train_freq=20,
-                            aneal_rate=0.99999, number=3)
+    DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=1000000, batch_size=32,
+                            episodes=20000, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=0, train_freq=20,
+                            aneal_rate=0.999, number=1)
     DQG_SOLVER.train()
-
-    DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=500000, batch_size=20,
-                            episodes=30, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=1000, train_freq=20,
-                            aneal_rate=0.999999, number=4)
-    DQG_SOLVER.train()
-
-    DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=10000000, start_training_steps=500000, batch_size=20,
-                            episodes=30, epsilon_max=1, epsilon_min=0.01, gamma=0.90, max_steps=1000, train_freq=20,
-                            aneal_rate=0.999999, number=5)
-    DQG_SOLVER.train()
-
-    DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=1000, batch_size=20,
-                            episodes=50, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=1000, train_freq=5,
-                            aneal_rate=0.9995, number=6)
-    DQG_SOLVER.train()
-
-    DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=1000, batch_size=20,
-                            episodes=20, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=10000, train_freq=10,
-                            aneal_rate=0.9995, number=7)
-    DQG_SOLVER.train()
-
-    DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=1000, batch_size=20,
-                            episodes=20, epsilon_max=1, epsilon_min=0.01, gamma=0.99, max_steps=10000, train_freq=10,
-                            aneal_rate=0.9995, number=8)
-    DQG_SOLVER.train()
-
-    DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=1000, batch_size=20,
-                            episodes=20, epsilon_max=1, epsilon_min=0.01, gamma=0.99, max_steps=10000, train_freq=10,
-                            aneal_rate=0.9995, number=9)
-    DQG_SOLVER.train()
-
-
