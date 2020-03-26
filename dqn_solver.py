@@ -5,6 +5,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from collections import deque
 
+
 class dqn_solver(object):
     def __init__(self, env, enviroment, model, memory_size, start_training_steps, batch_size, episodes, epsilon_max, epsilon_min,
                  gamma, max_steps, number, train_freq, aneal_rate):
@@ -34,12 +35,29 @@ class dqn_solver(object):
         self.memory.append((state_t_minus_1, action_t_minus_1, reward_t_minus_1, state_t, done))
         self.head_memory += 1
 
+    def prioritize_replay(self, steps):
+        if steps < 999:
+            for _ in range(10000):
+                for i in range(steps):
+                    if self.memory_size > _ + len(self.memory) - 1:
+                        el = self.memory[len(self.memory) - 1 - i]
+                        self.remember(el[0], el[1], el[2], el[3], el[4])
+
     def experience_replay(self):
         if self.head_memory < self.batch_size:
             return
         index = np.random.choice(np.arange(min(self.head_memory - 1, self.memory_size)), size=self.batch_size,
                                  replace=False)
-        return [self.memory[i] for i in index]
+        batch = [self.memory[i] for i in index]
+
+        if self.steps > self.start_training_steps and self.steps % self.train_freq == 0:
+            for state_t_minus_1, action_t_minus_1, reward_t_minus_1, state_t, done_t in batch:
+                q_update = reward_t_minus_1
+                if not done_t:
+                    q_update = (reward_t_minus_1 + self.gamma * np.amax(self.model.predict(state_t)[0]))
+                q_values = self.model.predict(state_t_minus_1)
+                q_values[0] = q_update
+                self.model.fit(state_t_minus_1, q_values, verbose=0)
 
     def policy(self, state, episode):
         if self.steps > self.start_training_steps:
@@ -50,6 +68,24 @@ class dqn_solver(object):
             action = self.model.predict(state)[0]# np.argmax(self.model.predict(state)[0])
 
         return action
+
+    def save_results(self, episode, steps_until_done_list):
+        if episode % 1 == 0 and self.steps > self.start_training_steps:
+            array = np.array(steps_until_done_list)
+            np.savetxt(f'{self.enviroment}_{self.number}_steps_per_episode.csv', array, delimiter=',')
+            plt.figure()
+            plt.plot(array)
+            plt.savefig(f'{self.enviroment}_{self.number}_steps_per_episode.png')
+            plt.close()
+
+            reward_array = np.array(self.reward_list)
+            np.savetxt(f'{self.enviroment}_reward_{self.number}.csv', reward_array, delimiter=',')
+            plt.figure()
+            plt.plot(reward_array)
+            plt.savefig(f'{self.enviroment}_reward_{self.number}.png')
+            plt.close()
+        if episode != 0 and self.steps > self.start_training_steps and episode % 5 == 0 or episode == self.episodes:
+            self.model.save(f'{self.enviroment}_{self.number}_epsidode{episode}')
 
     def train(self):
         done_list = []
@@ -69,43 +105,15 @@ class dqn_solver(object):
                 new_state = np.reshape(new_state, [1, self.observation_space])
                 total_reward += reward
                 self.remember(state, action, reward, new_state, done)
-
-                if self.steps > self.start_training_steps and self.steps % self.train_freq == 0:
-                    for state_t_minus_1, action_t_minus_1, reward_t_minus_1, state_t, done_t in self.experience_replay():
-                        q_update = reward_t_minus_1
-                        if not done_t:
-                            q_update = (reward_t_minus_1 + self.gamma * np.amax(self.model.predict(state_t)[0]))
-                        q_values = self.model.predict(state_t_minus_1)
-                        q_values[0] = q_update
-                        self.model.fit(state_t_minus_1, q_values, verbose=0)
+                self.experience_replay()
                 state = new_state
                 self.steps += 1
                 steps += 1
-            if steps < 999:
-                for _ in range(10000):
-                    for i in range(steps):
-                        if self.memory_size > _ + len(self.memory) - 1:
-                            el = self.memory[len(self.memory) - 1 - i]
-                            self.remember(el[0], el[1], el[2], el[3], el[4])
+            self.prioritize_replay(steps)
             self.reward_list.append(total_reward)
             done_list.append(1 if done else 0)
             steps_until_done_list.append(steps)
-            if episode % 1 == 0 and self.steps > self.start_training_steps:
-                array = np.array(steps_until_done_list)
-                np.savetxt(f'{self.enviroment}_{self.number}_steps_per_episode.csv', array, delimiter=',')
-                plt.figure()
-                plt.plot(array)
-                plt.savefig(f'{self.enviroment}_{self.number}_steps_per_episode.png')
-                plt.close()
-
-                reward_array = np.array(self.reward_list)
-                np.savetxt(f'{self.enviroment}_reward_{self.number}.csv', reward_array, delimiter=',')
-                plt.figure()
-                plt.plot(reward_array)
-                plt.savefig(f'{self.enviroment}_reward_{self.number}.png')
-                plt.close()
-            if episode != 0 and self.steps > self.start_training_steps and episode % 5 == 0 or episode == self.episodes:
-                self.model.save(f'{self.enviroment}_{self.number}_epsidode{episode}')
+            self.save_results(episode, steps_until_done_list)
 
 
 if __name__ == '__main__':
