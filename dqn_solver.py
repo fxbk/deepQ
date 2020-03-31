@@ -8,7 +8,7 @@ from collections import deque
 
 class dqn_solver(object):
     def __init__(self, env, enviroment, model, memory_size, start_training_steps, batch_size, episodes, epsilon_max, epsilon_min,
-                 gamma, max_steps, number, train_freq, aneal_rate, final_reward):
+                 gamma, max_steps, number, train_freq, aneal_rate, update_target_network):
         self.memory_size = memory_size
         self.start_training_steps = start_training_steps
         self.batch_size = batch_size
@@ -25,7 +25,8 @@ class dqn_solver(object):
         self.number = number
         self.train_freq = train_freq
         self.aneal_rate = aneal_rate
-        self.final_reward = final_reward
+        self.target_network = model
+        self.update_target_network = update_target_network
 
         self.observation_space = env.observation_space.shape[0]
         self.action_space = env.action_space.shape[0]
@@ -54,7 +55,7 @@ class dqn_solver(object):
             for state_t_minus_1, action_t_minus_1, reward_t_minus_1, state_t, done_t in batch:
                 q_update = reward_t_minus_1
                 if not done_t:
-                    q_update = (reward_t_minus_1 + self.gamma * np.amax(self.model.predict(state_t)[0]))
+                    q_update = (reward_t_minus_1 + self.gamma * np.amax(self.target_network.predict(state_t)[0]))
                 q_values = self.model.predict(state_t_minus_1)
                 q_values[0] = q_update
                 self.model.fit(state_t_minus_1, q_values, verbose=0)
@@ -86,6 +87,10 @@ class dqn_solver(object):
             plt.close()
         if episode != 0 and self.steps > self.start_training_steps and episode % 5 == 0 or episode == self.episodes:
             self.model.save(f'{self.enviroment}_{self.number}_epsisode{episode}')
+
+    def update_target_network(self, steps):
+        if self.steps > self.update_target_network:
+            self.target_network = self.model
 
     def train(self):
         done_list = []
@@ -127,8 +132,8 @@ if __name__ == '__main__':
     model.compile(loss='mse', optimizer=tf.keras.optimizers.Adam(lr=0.001))
 
     DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=2500000, batch_size=32,
-                            episodes=3000, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=0, train_freq=40,
-                            aneal_rate=0.999995, number=1, final_reward=100)
+                            episodes=3000, epsilon_max=1, epsilon_min=0.01, gamma=0.99, max_steps=0, train_freq=40,
+                            aneal_rate=0.9999, update_target_network=1000, number=1)
     DQG_SOLVER.train()
 
     DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=1000000, batch_size=32,

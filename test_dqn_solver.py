@@ -10,7 +10,7 @@ if __name__ == '__main__':
     env = gym.make(environment)
     observation_space = env.observation_space.shape[0]
     action_space = env.action_space.shape[0]
-    model = tf.keras.models.load_model('MountainCarContinuous-v0_1_epsisode2620')
+    model = tf.keras.models.load_model('MountainCarContinuous-v0_1_epsisode2560')
     total_reward_list = []
 
     for i in tqdm(range(10)):
@@ -30,6 +30,7 @@ if __name__ == '__main__':
             print(f'Episode: {i}')
             print(f'Done: {done}')
             print(f'Steps: {steps}')
+            print(f'Action: {action}')
             steps += 1
         total_reward_list.append(total_reward)
 
