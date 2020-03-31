@@ -2,7 +2,7 @@ import numpy as np
 import gym
 import os
 
-enviroment = 'MountainCar-v0'
+enviroment = 'CartPole-v1'
 env = gym.make(enviroment)
 Q = np.zeros((1, 1))
 states = []

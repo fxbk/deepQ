@@ -8,7 +8,7 @@ from collections import deque
 
 class dqn_solver(object):
     def __init__(self, env, enviroment, model, memory_size, start_training_steps, batch_size, episodes, epsilon_max, epsilon_min,
-                 gamma, max_steps, number, train_freq, aneal_rate):
+                 gamma, max_steps, number, train_freq, aneal_rate, final_reward):
         self.memory_size = memory_size
         self.start_training_steps = start_training_steps
         self.batch_size = batch_size
@@ -25,6 +25,7 @@ class dqn_solver(object):
         self.number = number
         self.train_freq = train_freq
         self.aneal_rate = aneal_rate
+        self.final_reward = final_reward
 
         self.observation_space = env.observation_space.shape[0]
         self.action_space = env.action_space.shape[0]
@@ -35,8 +36,8 @@ class dqn_solver(object):
         self.memory.append((state_t_minus_1, action_t_minus_1, reward_t_minus_1, state_t, done))
         self.head_memory += 1
 
-    def prioritize_replay(self, steps):
-        if steps < 999:
+    def prioritize_replay(self, steps, total_reward):
+        if steps < 999 and total_reward > 0:
             for _ in range(10000):
                 for i in range(steps):
                     if self.memory_size > _ + len(self.memory) - 1:
@@ -44,13 +45,12 @@ class dqn_solver(object):
                         self.remember(el[0], el[1], el[2], el[3], el[4])
 
     def experience_replay(self):
-        if self.head_memory < self.batch_size:
-            return
-        index = np.random.choice(np.arange(min(self.head_memory - 1, self.memory_size)), size=self.batch_size,
-                                 replace=False)
-        batch = [self.memory[i] for i in index]
-
         if self.steps > self.start_training_steps and self.steps % self.train_freq == 0:
+            if self.head_memory < self.batch_size:
+                return
+            index = np.random.choice(np.arange(min(self.head_memory - 1, self.memory_size)), size=self.batch_size,
+                                     replace=False)
+            batch = [self.memory[i] for i in index]
             for state_t_minus_1, action_t_minus_1, reward_t_minus_1, state_t, done_t in batch:
                 q_update = reward_t_minus_1
                 if not done_t:
@@ -70,7 +70,7 @@ class dqn_solver(object):
         return action
 
     def save_results(self, episode, steps_until_done_list):
-        if episode % 1 == 0 and self.steps > self.start_training_steps:
+        if episode % 1 == 0:
             array = np.array(steps_until_done_list)
             np.savetxt(f'{self.enviroment}_{self.number}_steps_per_episode.csv', array, delimiter=',')
             plt.figure()
@@ -85,7 +85,7 @@ class dqn_solver(object):
             plt.savefig(f'{self.enviroment}_reward_{self.number}.png')
             plt.close()
         if episode != 0 and self.steps > self.start_training_steps and episode % 5 == 0 or episode == self.episodes:
-            self.model.save(f'{self.enviroment}_{self.number}_epsidode{episode}')
+            self.model.save(f'{self.enviroment}_{self.number}_epsisode{episode}')
 
     def train(self):
         done_list = []
@@ -100,8 +100,6 @@ class dqn_solver(object):
                 # env.render()
                 action = self.policy(state, episode)
                 new_state, reward, done, info = env.step(action)
-                if done and steps < 999:
-                    reward = 30
                 new_state = np.reshape(new_state, [1, self.observation_space])
                 total_reward += reward
                 self.remember(state, action, reward, new_state, done)
@@ -109,7 +107,7 @@ class dqn_solver(object):
                 state = new_state
                 self.steps += 1
                 steps += 1
-            self.prioritize_replay(steps)
+            self.prioritize_replay(steps, total_reward)
             self.reward_list.append(total_reward)
             done_list.append(1 if done else 0)
             steps_until_done_list.append(steps)
@@ -128,7 +126,12 @@ if __name__ == '__main__':
                                  ])
     model.compile(loss='mse', optimizer=tf.keras.optimizers.Adam(lr=0.001))
 
+    DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=2500000, batch_size=32,
+                            episodes=3000, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=0, train_freq=40,
+                            aneal_rate=0.999995, number=1, final_reward=100)
+    DQG_SOLVER.train()
+
     DQG_SOLVER = dqn_solver(env, environemt, model, memory_size=1000000, start_training_steps=1000000, batch_size=32,
-                            episodes=20000, epsilon_max=1, epsilon_min=0.01, gamma=0.95, max_steps=0, train_freq=20,
-                            aneal_rate=0.999, number=1)
+                            episodes=2000, epsilon_max=1, epsilon_min=0.01, gamma=0.99, max_steps=0, train_freq=20,
+                            aneal_rate=0.999995, number=2, final_reward=100)
     DQG_SOLVER.train()
